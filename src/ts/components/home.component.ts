@@ -1,6 +1,7 @@
 import HomeStore from "../store/home.store";
 import type { TAlerts } from "../types/alert.type";
 import type { TEventNames } from "../types/events.type";
+import { SearchMovies } from "../utilities/api.service";
 
 const HomeComponent = (): string => {
     return `
@@ -48,7 +49,7 @@ export const HomeComponentEvents = () => {
     HomeStore.clearBtn?.addEventListener("click", HandleClear);
 };
 
-const StoreNativeHTMLElements = () => {
+const StoreNativeHTMLElements = (): void => {
     HomeStore.searchInput = document.querySelector<HTMLInputElement>("#search-input");
     HomeStore.searchBtn = document.querySelector<HTMLButtonElement>("#search-btn");
     HomeStore.clearBtn = document.querySelector<HTMLButtonElement>("#clear-btn");
@@ -56,7 +57,7 @@ const StoreNativeHTMLElements = () => {
     HomeStore.searchLoader = document.querySelector<HTMLDivElement>("#search-loader");
 }
 
-const ShowLoader = (status: boolean) => {
+const ShowLoader = (status: boolean): void => {
     const loader = HomeStore.searchLoader;
     if (!loader) return;
     if (status) {
@@ -68,7 +69,8 @@ const ShowLoader = (status: boolean) => {
     }
 };
 
-const ShowAlert = (message: string, type: TAlerts) => {
+const ShowAlert = (message: string, type: TAlerts): void => {
+    ClearAlert();
     const alertElement = document.createElement("div");
     alertElement.className = `alert alert-${type} alert-dismissible fade show`;
     alertElement.setAttribute("role", "alert");
@@ -79,23 +81,52 @@ const ShowAlert = (message: string, type: TAlerts) => {
     HomeStore.searchAlert?.appendChild(alertElement);
 };
 
+const ClearAlert = (): void => {
+    HomeStore.searchAlert!.innerHTML = ``;
+}
+
 const HandleSearch = async () => {
+    ClearAlert();
     const infoText = document.querySelector<HTMLDivElement>("#home_info_text");
     const query = HomeStore.searchInputValue.trim();
-    infoText?.classList.toggle("d-none");
+    HomeStore.searchInput!.value = query;
+
+    if (!infoText?.classList.contains("d-none"))
+        infoText?.classList.add("d-none");
+
     ShowLoader(true);
+
     if (query === undefined || query === null || query === "") {
         ShowAlert("Please enter a valid input", "warning");
+        const timeoutTask = setTimeout(() => {
+            if (infoText?.classList.contains("d-none")) {
+                infoText?.classList.remove("d-none");
+            }
+            ShowLoader(false);
+            clearTimeout(timeoutTask);
+        }, 500);
+        return;
     }
-    const timeoutTask = setTimeout(() => {
-        ShowLoader(false);
-        infoText?.classList.toggle("d-none");
-        clearTimeout(timeoutTask);
-    }, 500);
+
+    try {
+        const data = await SearchMovies(query);
+        console.log(data);
+    } catch (e) {
+        const error = e as Error;
+        ShowAlert(error.message, "danger");
+        if (infoText?.classList.contains("d-none")) {
+            infoText?.classList.remove("d-none");
+        }
+    }
+    ShowLoader(false);
 }
 
 const HandleClear = () => {
     HomeStore.searchInput!.value = "";
+    DispatchInputEvent();
+}
+
+const DispatchInputEvent = () => {
     HomeStore.searchInput!.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
